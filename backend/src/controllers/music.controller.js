@@ -1,10 +1,6 @@
 const musicModel = require("../models/music.models.js");
 const { uploadFile } = require("../services/storage.services.js");
 
-/**
- * Uploads an audio track to ImageKit and records it in the database.
- * Only accessible by authenticated artists.
- */
 async function createMusic(req, res, next) {
     try {
         const title = (req.body && req.body.title ? String(req.body.title) : "").trim();
@@ -69,9 +65,23 @@ async function createMusic(req, res, next) {
 /**
  * Retrieves the full catalog of music tracks.
  */
-async function getMusicList(req, res, next) {
+async function getAllMusic(req, res, next) {
     try {
-        const musics = await musicModel.getAllMusic();
+        const rawMusics = await musicModel.getAllMusic();
+
+        const musics = rawMusics.map(track => ({
+            id: track.id,
+            title: track.title,
+            uri: track.uri,
+            artist: {
+                id: track.artistId,
+                username: track.artistName,
+            },
+            artistId: track.artistId,
+            artistName: track.artistName,
+            created_at: track.created_at,
+        }));
+
         return res.status(200).json({
             message: "Music fetched successfully.",
             musics,
@@ -128,7 +138,8 @@ async function getMyMusic(req, res, next) {
 
 module.exports = {
     createMusic,
-    getMusicList,
+    getAllMusic,
+    getMusicList: getAllMusic,
     getMusicById,
     getMyMusic,
 };

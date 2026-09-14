@@ -2,7 +2,34 @@ const albumModel = require("../models/album.models.js");
 const musicModel = require("../models/music.models.js");
 
 /**
+ * Formats an album database record into a clean JSON structure with nested music and artist objects.
+ */
+function formatAlbum(album) {
+    if (!album) return null;
+    return {
+        id: album.id,
+        title: album.title,
+        musicId: album.musicId,
+        music: album.musicId ? {
+            id: album.musicId,
+            title: album.musicTitle,
+            uri: album.musicUri,
+        } : null,
+        artistId: album.artistId,
+        artist: {
+            id: album.artistId,
+            username: album.artistName,
+        },
+        artistName: album.artistName,
+        musicTitle: album.musicTitle,
+        musicUri: album.musicUri,
+        created_at: album.created_at,
+    };
+}
+
+/**
  * Creates a new album associated with an audio track and the authenticated artist.
+ * Accessible ONLY by artists.
  */
 async function createAlbum(req, res, next) {
     try {
@@ -49,7 +76,18 @@ async function createAlbum(req, res, next) {
 
         return res.status(201).json({
             message: "Album created successfully.",
-            album,
+            album: {
+                ...album,
+                artist: {
+                    id: req.user.id,
+                    username: req.user.username,
+                },
+                music: {
+                    id: track.id,
+                    title: track.title,
+                    uri: track.uri,
+                }
+            },
         });
     } catch (error) {
         next(error);
@@ -58,10 +96,13 @@ async function createAlbum(req, res, next) {
 
 /**
  * Retrieves all albums across the platform.
+ * Accessible by both users and artists.
  */
 async function getAllAlbum(req, res, next) {
     try {
-        const albums = await albumModel.getAllAlbum();
+        const rawAlbums = await albumModel.getAllAlbum();
+        const albums = rawAlbums.map(formatAlbum);
+
         return res.status(200).json({
             message: "Albums fetched successfully.",
             albums,
@@ -73,6 +114,7 @@ async function getAllAlbum(req, res, next) {
 
 /**
  * Retrieves a single album by its ID.
+ * Accessible by both users and artists.
  */
 async function getAlbumById(req, res, next) {
     try {
@@ -84,13 +126,15 @@ async function getAlbumById(req, res, next) {
             });
         }
 
-        const album = await albumModel.getAlbumById(id);
-        if (!album) {
+        const rawAlbum = await albumModel.getAlbumById(id);
+        if (!rawAlbum) {
             return res.status(404).json({
                 error: "Not Found",
-                message: "Album not found.",
+                message: `Album with ID ${id} was not found.`,
             });
         }
+
+        const album = formatAlbum(rawAlbum);
 
         return res.status(200).json({
             message: "Album fetched successfully.",
@@ -106,7 +150,9 @@ async function getAlbumById(req, res, next) {
  */
 async function getMyAlbums(req, res, next) {
     try {
-        const albums = await albumModel.getAlbumsByArtist(req.user.id);
+        const rawAlbums = await albumModel.getAlbumsByArtist(req.user.id);
+        const albums = rawAlbums.map(formatAlbum);
+
         return res.status(200).json({
             message: "Artist albums fetched successfully.",
             albums,
@@ -119,6 +165,8 @@ async function getMyAlbums(req, res, next) {
 module.exports = {
     createAlbum,
     getAllAlbum,
+    getAlbum: getAllAlbum, // alias
+    getAlbums: getAllAlbum, // alias
     getAlbumById,
     getMyAlbums,
 };
